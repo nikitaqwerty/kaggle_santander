@@ -54,17 +54,26 @@ def main():
     feature_generator(test, vcs_train_test)
 
     params = {
-        'task_type': 'GPU',
+        'task_type': 'CPU',
         'iterations': 20000,
         'loss_function': 'Logloss',
-        'eval_metric': 'AUC',
+        'eval_metric':'AUC',
         'random_seed': 4242,
         "learning_rate": 0.03,
         "l2_leaf_reg": 3.0,
         'bagging_temperature': 1,
         'random_strength': 1,
         'depth': 4,
-        'border_count': 128}
+        'border_count':128}
+
+    finded_params = {'bagging_temperature': 0.8951400796871222,
+      'border_count': int(251.45219881460767),
+      'depth': int(2.6548614045893313),
+      'l2_leaf_reg': 78.7185391163484,
+      'learning_rate': 0.042685136850822626,
+      'random_strength': 18.94984401001372}
+
+    params.update(finded_params)
 
     folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     oof = np.zeros(len(train))
