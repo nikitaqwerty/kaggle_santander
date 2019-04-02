@@ -2,7 +2,7 @@
 
 import pandas as pd
 import numpy as np
-import lightgbm as lgb
+import xgboost as xgb
 import warnings
 
 from tqdm import tqdm
@@ -28,7 +28,7 @@ def main():
     input_path = "../input/"
     output_path = "../output/"
 
-    print("lgb:", lgb.__version__)
+    print("xgb:", xgb.__version__)
     print("loading data...")
 
     train_df = pd.read_csv(input_path + 'train.csv.zip')
@@ -55,21 +55,22 @@ def main():
     rounds = 10000
     early_stop_rounds = 300
 
-    params = {'lambda_l1': 0,
-              'lambda_l2': 3,
-              'feature_fraction': 0.9,
-              'learning_rate': 0.03,
+    params = {'eval_metric': 'auc',
+              'booster': 'gbtree',
+              'tree_method': 'hist',
+              'objective': 'binary:logistic',
+              'subsample': 0.9,
+              'colsample_bytree': 0.9,
+              'eta': 0.03,
               'max_depth': 4,
-              'boosting_type': 'gbrt',
-              'objective': 'binary',
-              'metric': 'auc',
-              'max_bin': 1023,
-              'n_jobs': -1,
-              'verbose': -1}
+              'base_score': 0.11,
+              'seed': 42,
+              'verbosity': 0}
 
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     oof = np.zeros(len(train))
     predictions = np.zeros(len(test))
+    d_test = xgb.DMatrix(test)
 
     for train_index, valid_index in skf.split(train, label):
 
@@ -79,25 +80,25 @@ def main():
         y_train = label.iloc[train_index]
         y_valid = label.iloc[valid_index]
 
-        d_train = lgb.Dataset(X_train, y_train)
-        d_valid = lgb.Dataset(X_valid, y_valid)
+        d_train = xgb.DMatrix(X_train, y_train)
+        d_valid = xgb.DMatrix(X_valid, y_valid)
 
-        model = lgb.train(params,
+        model = xgb.train(params,
                           d_train,
-                          num_boost_round=rounds,
-                          valid_sets=[d_train, d_valid],
-                          valid_names=['train', 'valid'],
+                          rounds,
+                          [(d_train, 'train'), (d_valid, 'eval')],
                           early_stopping_rounds=early_stop_rounds,
-                          verbose_eval=500)
+                          verbose_eval=50)
 
-        oof[valid_index] = model.predict(X_valid)
-        predictions += model.predict(test) / skf.n_splits
+        best = model.best_iteration + 1
+        oof[valid_index] = model.predict(X_valid, ntree_limit=best)
+        predictions += model.predict(d_test, ntree_limit=best) / skf.n_splits
 
     auc = round(roc_auc_score(label, oof), 5)
     print("CV score: {:<8.5f}".format(auc))
 
-    np.save(output_path + f"xgb_{auc}_oof.npy", oof)
-    np.save(output_path + f"xgb_{auc}_test.npy", predictions)
+    np.save(output_path + f"lgb_{auc}_oof.npy", oof)
+    np.save(output_path + f"lgb_{auc}_test.npy", predictions)
 
 if __name__ == "__main__":
     main()
