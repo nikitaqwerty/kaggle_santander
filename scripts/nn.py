@@ -43,8 +43,7 @@ def batch_iter(X, y, batch_size=64):
 
 class NN(torch.nn.Module):
 
-    def __init__(self, D_in=3, enc_out=30, features=200, random_seed=42):
-
+    def __init__(self, D_in=3, enc_out=30, features=200):
         super(NN, self).__init__()
         self.layer = []
         layer_size = D_in
@@ -70,6 +69,7 @@ class NN(torch.nn.Module):
 
 def main():
     random_seed = 42
+
     np.random.seed(random_seed)
     random.seed(random_seed)
     torch.manual_seed(random_seed)
@@ -110,13 +110,13 @@ def main():
 
     loss_f = BCEWithLogitsLoss()
     batch_size = 16384
-    device = torch.device('cuda:3')
+    device = torch.device('cuda:0')
 
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     oof = np.zeros(len(train))
     predictions = np.zeros(len(test))
 
-    for fold_, (trn_idx, val_idx) in enumerate(skf.split(X_train.values, label.values)):
+    for fold_, (trn_idx, val_idx) in enumerate(folds.split(X_train.values, label.values)):
         print("Fold {}".format(fold_))
 
         train_tensors = []
@@ -152,7 +152,12 @@ def main():
 
         nn = NN().to(device)
         optimizer = Adam(params=nn.parameters(), lr=0.005)
-        scheduler = ReduceLROnPlateau(optimizer, 'max', factor=0.5, patience=5, min_lr=0.0001, verbose=True)
+        scheduler = ReduceLROnPlateau(optimizer,
+                                      'max',
+                                      factor=0.5,
+                                      patience=5,
+                                      min_lr=0.0001,
+                                      verbose=True)
         best_AUC = 0
         early_stop = 0
 
@@ -175,7 +180,7 @@ def main():
                 if AUC > best_AUC:
                     early_stop = 0
                     best_AUC = AUC
-                    torch.save(nn, 'best_auc_nn.pkl')
+                    torch.save(nn, output_path + 'best_auc_nn.pkl')
                 else:
                     early_stop += 1
                     print('SCORE IS NOT THE BEST. Early stop counter: {}'.format(early_stop))
@@ -185,7 +190,7 @@ def main():
                     break
                 print('=' * 50)
 
-            best_model = torch.load('best_auc_nn.pkl')
+            best_model = torch.load(output_path + 'best_auc_nn.pkl')
 
         with torch.no_grad():
             oof[val_idx] = best_model(val_tensors).data.cpu().numpy().flatten()
@@ -194,9 +199,9 @@ def main():
             for batch in torch.split(test_tensors, 20000):
                 blob = best_model(batch).data.cpu().numpy().flatten()
                 blobs.append(blob)
-        predictions_test = np.concatenate(blobs)
 
-        predictions += predictions_test / skf.n_splits
+        predictions_test = np.concatenate(blobs)
+        predictions += predictions_test / folds.n_splits
 
     auc = round(roc_auc_score(label, oof), 5)
     print("CV score: {:<8.5f}".format(auc))
