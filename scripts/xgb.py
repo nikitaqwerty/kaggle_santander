@@ -53,17 +53,16 @@ def main():
     feature_generator(test, vcs_train_test)
 
     rounds = 10000
-    early_stop_rounds = 300
+    early_stop_rounds = 100
 
     params = {'eval_metric': 'auc',
               'booster': 'gbtree',
               'tree_method': 'hist',
               'objective': 'binary:logistic',
-              'subsample': 0.9,
-              'colsample_bytree': 0.9,
+              # 'subsample': 0.9,
+              # 'colsample_bytree': 0.9,
               'eta': 0.03,
               'max_depth': 4,
-              'base_score': 0.11,
               'seed': 42,
               'verbosity': 0}
 
@@ -91,7 +90,7 @@ def main():
                           verbose_eval=50)
 
         best = model.best_iteration + 1
-        oof[valid_index] = model.predict(X_valid, ntree_limit=best)
+        oof[valid_index] = model.predict(d_valid, ntree_limit=best)
         predictions += model.predict(d_test, ntree_limit=best) / skf.n_splits
 
     auc = round(roc_auc_score(label, oof), 5)
