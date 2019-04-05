@@ -82,27 +82,28 @@ class NN(torch.nn.Module):
         super(NN, self).__init__()
         self.layer = []
         layer_size = D_in
+        h_size = int(enc_out / enc_hidden_layer_k)
         for i in range(features):
             if use_dropout and not use_BN:
-                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // enc_hidden_layer_k),
-                                            torch.nn.Linear(int(enc_out / enc_hidden_layer_k), enc_out),
+                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, h_size),
+                                            torch.nn.Linear(h_size, enc_out),
                                             torch.nn.ReLU(),
                                             torch.nn.Dropout()
                                             )
             elif not use_dropout and not use_BN:
-                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // enc_hidden_layer_k),
-                                            torch.nn.Linear(int(enc_out / enc_hidden_layer_k), enc_out),
+                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, h_size),
+                                            torch.nn.Linear(h_size, enc_out),
                                             torch.nn.ReLU()
                                             )
             elif not use_dropout and use_BN:
-                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // enc_hidden_layer_k),
-                                            torch.nn.Linear(int(enc_out / enc_hidden_layer_k), enc_out),
+                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, h_size),
+                                            torch.nn.Linear(h_size, enc_out),
                                             torch.nn.ReLU(),
                                             torch.nn.BatchNorm1d(num_features=enc_out)
                                             )
             elif use_dropout and use_BN:
-                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // enc_hidden_layer_k),
-                                            torch.nn.Linear(int(enc_out / enc_hidden_layer_k), enc_out),
+                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, h_size),
+                                            torch.nn.Linear(h_size, enc_out),
                                             torch.nn.ReLU(),
                                             torch.nn.BatchNorm1d(num_features=enc_out),
                                             torch.nn.Dropout(),
