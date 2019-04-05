@@ -56,16 +56,24 @@ def main():
     rounds = 10000
     early_stop_rounds = 300
 
-    param_grid = {'max_depth': [3, 4, 5],
-                  'max_bin': [255, 511, 1023],
-                  'learning_rate': np.linspace(0.01, 0.05, 51),
-                  'feature_fraction': np.linspace(0.6, 1.0, 51),
-                  'lambda_l1': np.linspace(0, 2, 31),
-                  'lambda_l2': np.linspace(0, 2, 31)}
+    param_grid = {'num_leaves': list(range(10, 33)),
+                  'max_bin': [511, 1023, 2047],
+                  'min_data_in_leaf': list(range(10, 100, 10)),
+                  'min_sum_hessian_in_leaf': list(range(0, 20)),
+                  'learning_rate': np.linspace(0.01, 0.03, 31),
+                  "bagging_freq": list(range(1, 10)),
+                  "bagging_fraction": np.linspace(0.3, 1.0, 61),
+                  'feature_fraction': np.linspace(0.01, 1.0, 101),
+                  'lambda_l1': np.linspace(0, 5, 61),
+                  'lambda_l2': np.linspace(0, 5, 61)}
 
     param_static = {'boosting_type': 'gbrt',
                     'objective': 'binary',
+                    'tree_learner': 'serial',
                     'metric': 'auc',
+                    'bagging_seed': 42,
+                    'seed': 42,
+                    'max_depth': -1,
                     'verbose': -1,
                     'n_jobs': -1}
 
