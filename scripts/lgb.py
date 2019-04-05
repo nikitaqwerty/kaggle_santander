@@ -20,6 +20,7 @@ def feature_generator(df, vcs_train_test):
 
         df[col + '_train_test_sum_vcs'] = t
         df[col + '_train_test_sum_vcs_prod'] = df[col] * t
+        df[col + '_train_test_sum_vcs_unique'] = np.array(t == 1).astype(int)
         df[col + '_train_test_sum_vcs_minus'] = scale(df[col]) - scale(t)
         df[col + '_train_test_sum_vcs_plus'] = scale(df[col]) + scale(t)
 
@@ -63,11 +64,12 @@ def main():
               'boosting_type': 'gbrt',
               'objective': 'binary',
               'metric': 'auc',
+              'weight': [1, 0.09902 / 0.10049],
               'max_bin': 1023,
               'n_jobs': -1,
               'verbose': -1}
 
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
     oof = np.zeros(len(train))
     predictions = np.zeros(len(test))
 
@@ -96,8 +98,8 @@ def main():
     auc = round(roc_auc_score(label, oof), 5)
     print("CV score: {:<8.5f}".format(auc))
 
-    np.save(output_path + f"xgb_{auc}_oof.npy", oof)
-    np.save(output_path + f"xgb_{auc}_test.npy", predictions)
+    np.save(output_path + f"lgb_{auc}_oof.npy", oof)
+    np.save(output_path + f"lgb_{auc}_test.npy", predictions)
 
 if __name__ == "__main__":
     main()
