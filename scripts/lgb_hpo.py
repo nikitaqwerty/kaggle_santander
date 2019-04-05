@@ -6,11 +6,44 @@ import lightgbm as lgb
 import warnings
 
 from tqdm import tqdm
+from os.path import isfile
 from sklearn.preprocessing import scale
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold, ParameterSampler
 
 warnings.filterwarnings("ignore")
+
+def shuffle_cols(x1, ids):
+    for i in tqdm(range(200)):
+        np.random.shuffle(ids)
+        for j in range(6):
+            col = i + 200 * j
+            x1[:, col] = x1[ids][:, col]
+
+def augment(x, y, t=2):
+    xs, xn = [], []
+    for i in range(t):
+        mask = y == 1
+        x1 = x[mask].copy()
+        ids = np.arange(x1.shape[0])
+        shuffle_cols(x1, ids)
+        xs.append(x1)
+
+    for i in range(1):
+        mask = y == 0
+        x1 = x[mask].copy()
+        ids = np.arange(x1.shape[0])
+        shuffle_cols(x1, ids)
+        xn.append(x1)
+
+    xs = np.vstack(xs)
+    xn = np.vstack(xn)
+    ys = np.ones(xs.shape[0])
+    yn = np.zeros(xn.shape[0])
+    x = np.vstack([x, xs, xn])
+    y = np.concatenate([y, ys, yn])
+
+    return x, y
 
 def feature_generator(df, vcs_train_test):
     for i in tqdm(range(200)):
@@ -54,7 +87,7 @@ def main():
     feature_generator(test, vcs_train_test)
 
     rounds = 10000
-    early_stop_rounds = 300
+    early_stop_rounds = 500
 
     param_grid = {'num_leaves': list(range(10, 33)),
                   'max_bin': [511, 1023, 2047],
@@ -96,11 +129,18 @@ def main():
         for train_index, valid_index in skf.split(train, label):
             j += 1
 
-            X_train = train.iloc[train_index]
-            X_valid = train.iloc[valid_index]
+            X_train, y_train = train.iloc[train_index], label.iloc[train_index]
+            X_valid, y_valid = train.iloc[valid_index], label.iloc[valid_index]
 
-            y_train = label.iloc[train_index]
-            y_valid = label.iloc[valid_index]
+            # if not isfile(output_path + f'train_{j}.feather'):
+            #     X_tr, y_tr = augment(X_train.values, y_train.values)
+            #     X_tr = pd.DataFrame(X_tr, columns=list(train.columns))
+
+            #     X_tr.to_feather(output_path + f'train_{j}.feather')
+            #     np.save(output_path + f'train_{j}.npy', y_tr)
+            # else:
+            #     X_tr = pd.read_feather(output_path + f'train_{j}.feather')
+            #     y_tr = np.load(output_path + f'train_{j}.npy')
 
             d_train = lgb.Dataset(X_train, y_train)
             d_valid = lgb.Dataset(X_valid, y_valid)
@@ -114,9 +154,9 @@ def main():
                               verbose_eval=0)
 
             pred = model.predict(X_valid)
-
             auc += round(roc_auc_score(y_valid, pred), 5)
             auc /= j
+
             print(i, j, "CV score: {:<8.5f}".format(auc))
 
             if j >= 2:
