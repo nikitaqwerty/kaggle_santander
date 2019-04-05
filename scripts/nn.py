@@ -2,10 +2,13 @@
 import pandas as pd
 import numpy as np
 import torch
+import sys
+import time
 import random
 import warnings
 
 from tqdm import tqdm
+from random import choice
 from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedKFold
@@ -17,37 +20,36 @@ from torch.nn.modules.loss import BCEWithLogitsLoss
 warnings.filterwarnings("ignore")
 
 
-class UpsamplingPreprocessor():
+class UpsamplingPreprocessor:
     def __init__(self, times=10, neg_class_balancer=2):
         self.times = times
         self.neg_class_balancer = neg_class_balancer
+        self.random_seed = 42
 
     # Data augmentation
     def augment_class(self, X):
         X_new = X.copy()
-        ids = np.arange(X.shape[0])
 
         for c in range(X.shape[1]):
-            np.random.shuffle(ids)
-            X_new[:, c] = X[ids][:, c]
+            np.random.shuffle(X_new[:, c])
 
         return X_new
 
-    def augment(self, X, y, t=2):
-        np.random.seed(42)
+    def augment(self, X, y):
+        np.random.seed(self.random_seed)
 
-        t_pos = t
-        t_neg = t // self.neg_class_balancer
+        t_pos = self.times
+        t_neg = self.times // self.neg_class_balancer
 
         X_pos_orig = X[y == 1]
         X_neg_orig = X[y == 0]
         X_pos = np.zeros((t_pos, *X_pos_orig.shape), dtype=X.dtype)
         X_neg = np.zeros((t_neg, *X_neg_orig.shape), dtype=X.dtype)
 
-        for i in tqdm(range(t_pos)):
+        for i in range(t_pos):
             X_pos[i] = self.augment_class(X_pos_orig)
 
-        for i in tqdm(range(t_neg)):
+        for i in range(t_neg):
             X_neg[i] = self.augment_class(X_neg_orig)
 
         X_pos = np.vstack(X_pos)
@@ -61,7 +63,7 @@ class UpsamplingPreprocessor():
 
     def fit_transform(self, X, y=None):
         var_cols = ['var_{}'.format(x) for x in range(200)]
-        X_augmented, y = self.augment(X.values, y, t=self.times)
+        X_augmented, y = self.augment(X.values, y)
         return pd.DataFrame(X_augmented, columns=var_cols), y
 
     def transform(self, X):
@@ -84,13 +86,13 @@ class NN(torch.nn.Module):
         for i in range(features):
             if use_dropout:
                 layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // 2),
-                                            torch.nn.Linear(enc_out // enc_hidden_layer_k, enc_out),
+                                            torch.nn.Linear(int(enc_out / enc_hidden_layer_k), enc_out),
                                             torch.nn.ReLU(),
                                             torch.nn.Dropout()
                                             )
             else:
                 layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // 2),
-                                            torch.nn.Linear(enc_out // enc_hidden_layer_k, enc_out),
+                                            torch.nn.Linear(int(enc_out / enc_hidden_layer_k), enc_out),
                                             torch.nn.ReLU()
                                             )
             setattr(self, 'layer_' + str(i), layer)
@@ -120,31 +122,36 @@ def batch_iter(X, y, batch_size=64):
 
 
 def main():
-    HYPERPARAMETERS = {
-        'batch_size': 8192,  # [8192//2, 8192*2]
-        'nn_encoder_out': 30,  # [20,40]
-        'enc_hidden_layer_k': 2,# [0.5,4] denominator of nn 'nn_encoder_out' E.G. if 'nn_encoder_out' = 30 so every feature encoder hidden layer size will be 15
-        'n_splits': 12,  # n folds
-        'optimizer': 'adam',  # ['RMSprop','adam']
-        'lr': 0.005,  # [0.01,0.001]
-        'use_dropout': False,
-        'lr_sheduler_factor': 0.5,  # [0.1,0.9]
-        'lr_sheduler_patience': 4,  # [3,15]
-        'lr_sheduler_min_lr': 0.0001,  # not so important but non't have to be too small
-        'max_epoch': 9999,  # we want to use early_stop so just need to be big
-        'early_stop_wait': 20,  # bigger - better but slower, but i guess 20 is okay
-        'upsampling_times': 10, # [3,20] more = slower
-        'upsampling_class_balancer': 2 # [0.1,7]
-    }
-
-
-
-    random_seed = 42
+    gpu_num = int(sys.argv[1])
+    random_seed = (int(time.time()) * (gpu_num + 1)) % (2**31 - 1)
 
     np.random.seed(random_seed)
     random.seed(random_seed)
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed(random_seed)
+
+    HYPERPARAMETERS = {
+        'batch_size': 8192,  # [8192//2, 8192*2]
+        'nn_encoder_out': choice(list(range(10, 100))),  # [20,40]
+        'enc_hidden_layer_k': choice(np.linspace(0.5, 4.0, 8)),# [0.5,4] denominator of nn 'nn_encoder_out' E.G. if 'nn_encoder_out' = 30 so every feature encoder hidden layer size will be 15
+        'n_splits': 10,  # n folds
+        'optimizer': 'adam',  # ['RMSprop','adam']
+        'lr': choice(np.linspace(0.001, 0.01, 10)),  # [0.01,0.001]
+        'use_dropout': False,
+        'lr_sheduler_factor': choice(np.linspace(0.1, 0.9, 9)),  # [0.1,0.9]
+        'lr_sheduler_patience': choice(list(range(3, 15))),  # [3,15]
+        'lr_sheduler_min_lr': 0.0001,  # not so important but non't have to be too small
+        'max_epoch': 9999,  # we want to use early_stop so just need to be big
+        'early_stop_wait': 20,  # bigger - better but slower, but i guess 20 is okay
+        'upsampling_times': choice(list(range(3, 20))), # [3,20] more = slower
+        'upsampling_class_balancer': choice(list(range(2, 10))) # [0.1,7]
+    }
+
+    for key in HYPERPARAMETERS:
+        print(key, HYPERPARAMETERS[key])
+
+    print("\nSEED:", random_seed)
+    print("GPU:", gpu_num, "\n")
 
     input_path = "../input/"
     output_path = "../output/"
@@ -179,12 +186,11 @@ def main():
 
     batch_size = HYPERPARAMETERS['batch_size']
     N_IN = 2
-    gpu_num = 2
 
     gpu = torch.device(f'cuda:{gpu_num}')
     cpu = torch.device('cpu')
 
-    folds = StratifiedKFold(n_splits=HYPERPARAMETERS['n_splits'], shuffle=False, random_state=99999)
+    folds = StratifiedKFold(n_splits=HYPERPARAMETERS['n_splits'], shuffle=True, random_state=42)
     oof = np.zeros(len(train))
     predictions = np.zeros(len(test))
     for fold_, (trn_idx, val_idx) in enumerate(folds.split(train.values, label)):
@@ -269,7 +275,7 @@ def main():
                 if AUC > best_AUC:
                     early_stop = 0
                     best_AUC = AUC
-                    torch.save(nn, f'best_auc_nn_{gpu_num}.pkl')
+                    torch.save(nn, output_path + f'best_auc_nn_{gpu_num}.pkl')
                 else:
                     early_stop += 1
                     print('SCORE IS NOT THE BEST. Early stop counter: {}'.format(early_stop))
@@ -279,7 +285,7 @@ def main():
                     break
                 print('=' * 50)
 
-            best_model = torch.load(f'best_auc_nn_{gpu_num}.pkl')
+            best_model = torch.load(output_path + f'best_auc_nn_{gpu_num}.pkl')
 
         with torch.no_grad():
             best_model.eval()
