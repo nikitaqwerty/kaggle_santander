@@ -161,9 +161,11 @@ def main():
         'upsampling_times': choice(list(range(3, 20))),  # [3,20] more = slower
         'upsampling_class_balancer': choice(list(range(2, 10)))  # [0.1,7]
     }
-
-    for key in HYPERPARAMETERS:
-        print(key, HYPERPARAMETERS[key])
+    
+    with open(f"log_{gpu_num}.txt", "a") as f:
+        for key in HYPERPARAMETERS:
+            f.write(key + " " + str(HYPERPARAMETERS[key]) + "\n")
+            print(key, HYPERPARAMETERS[key])
 
     print("\nSEED:", random_seed)
     print("GPU:", gpu_num, "\n")
@@ -312,6 +314,10 @@ def main():
 
             oof[val_idx] = np.concatenate(blobs)
 
+            auc = round(roc_auc_score(Val_label, oof[val_idx]), 5)
+            with open(f"log_{gpu_num}.txt", "a") as f:
+                f.write(str(fold_) + " " + str(auc) + "\n")
+
             blobs = []
             for batch in torch.split(test_tensors, batch_size):
                 blob = best_model(batch).data.cpu().numpy().flatten()
@@ -323,8 +329,11 @@ def main():
     auc = round(roc_auc_score(label, oof), 5)
     print("CV score: {:<8.5f}".format(auc))
 
-    np.save(output_path + f"nn_{auc}_oof.npy", oof)
-    np.save(output_path + f"nn_{auc}_test.npy", predictions)
+    with open(f"log_{gpu_num}.txt", "a") as f:
+        f.write("OOF " + str(auc) + "\n")
+
+    np.save(output_path + f"nn_{gpu_num}_{auc}_oof.npy", oof)
+    np.save(output_path + f"nn_{gpu_num}_{auc}_test.npy", predictions)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,15 @@
+batch_size 8192
+nn_encoder_out 35
+enc_hidden_layer_k 3.5
+n_splits 10
+optimizer adam
+lr 0.006
+use_dropout True
+use_bn False
+lr_sheduler_factor 0.4
+lr_sheduler_patience 8
+lr_sheduler_min_lr 0.0001
+max_epoch 9999
+early_stop_wait 20
+upsampling_times 4
+upsampling_class_balancer 9
