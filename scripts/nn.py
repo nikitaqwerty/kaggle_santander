@@ -1,4 +1,3 @@
-
 import pandas as pd
 import numpy as np
 import torch
@@ -79,21 +78,34 @@ def generate_features(df, vcs_train_test, cols):
 
 
 class NN(torch.nn.Module):
-    def __init__(self, D_in=5, features=200, enc_out=30, enc_hidden_layer_k=2,use_dropout = False):
+    def __init__(self, D_in=5, features=200, enc_out=30, enc_hidden_layer_k=2, use_dropout=False, use_BN=False):
         super(NN, self).__init__()
         self.layer = []
         layer_size = D_in
         for i in range(features):
-            if use_dropout:
-                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // 2),
+            if use_dropout and not use_BN:
+                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // enc_hidden_layer_k),
                                             torch.nn.Linear(int(enc_out / enc_hidden_layer_k), enc_out),
                                             torch.nn.ReLU(),
                                             torch.nn.Dropout()
                                             )
-            else:
-                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // 2),
+            elif not use_dropout and not use_BN:
+                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // enc_hidden_layer_k),
                                             torch.nn.Linear(int(enc_out / enc_hidden_layer_k), enc_out),
                                             torch.nn.ReLU()
+                                            )
+            elif not use_dropout and use_BN:
+                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // enc_hidden_layer_k),
+                                            torch.nn.Linear(int(enc_out / enc_hidden_layer_k), enc_out),
+                                            torch.nn.ReLU(),
+                                            torch.nn.BatchNorm1d(num_features=enc_out)
+                                            )
+            elif use_dropout and use_BN:
+                layer = torch.nn.Sequential(torch.nn.Linear(layer_size, enc_out // enc_hidden_layer_k),
+                                            torch.nn.Linear(int(enc_out / enc_hidden_layer_k), enc_out),
+                                            torch.nn.ReLU(),
+                                            torch.nn.BatchNorm1d(num_features=enc_out),
+                                            torch.nn.Dropout(),
                                             )
             setattr(self, 'layer_' + str(i), layer)
 
@@ -123,7 +135,7 @@ def batch_iter(X, y, batch_size=64):
 
 def main():
     gpu_num = int(sys.argv[1])
-    random_seed = (int(time.time()) * (gpu_num + 1)) % (2**31 - 1)
+    random_seed = (int(time.time()) * (gpu_num + 1)) % (2 ** 31 - 1)
 
     np.random.seed(random_seed)
     random.seed(random_seed)
@@ -133,18 +145,20 @@ def main():
     HYPERPARAMETERS = {
         'batch_size': 8192,  # [8192//2, 8192*2]
         'nn_encoder_out': choice(list(range(10, 100))),  # [20,40]
-        'enc_hidden_layer_k': choice(np.linspace(0.5, 4.0, 8)),# [0.5,4] denominator of nn 'nn_encoder_out' E.G. if 'nn_encoder_out' = 30 so every feature encoder hidden layer size will be 15
+        'enc_hidden_layer_k': choice(np.linspace(0.5, 4.0, 8)),
+    # [0.5,4] denominator of nn 'nn_encoder_out' E.G. if 'nn_encoder_out' = 30 so every feature encoder hidden layer size will be 15
         'n_splits': 10,  # n folds
         'optimizer': 'adam',  # ['RMSprop','adam']
         'lr': choice(np.linspace(0.001, 0.01, 10)),  # [0.01,0.001]
-        'use_dropout': False,
+        'use_dropout': choice([True,False]),
+        'use_bn': choice([True,False]),
         'lr_sheduler_factor': choice(np.linspace(0.1, 0.9, 9)),  # [0.1,0.9]
         'lr_sheduler_patience': choice(list(range(3, 15))),  # [3,15]
         'lr_sheduler_min_lr': 0.0001,  # not so important but non't have to be too small
         'max_epoch': 9999,  # we want to use early_stop so just need to be big
         'early_stop_wait': 20,  # bigger - better but slower, but i guess 20 is okay
-        'upsampling_times': choice(list(range(3, 20))), # [3,20] more = slower
-        'upsampling_class_balancer': choice(list(range(2, 10))) # [0.1,7]
+        'upsampling_times': choice(list(range(3, 20))),  # [3,20] more = slower
+        'upsampling_class_balancer': choice(list(range(2, 10)))  # [0.1,7]
     }
 
     for key in HYPERPARAMETERS:
@@ -236,7 +250,8 @@ def main():
         nn = NN(D_in=N_IN,
                 enc_out=HYPERPARAMETERS['nn_encoder_out'],
                 enc_hidden_layer_k=HYPERPARAMETERS['enc_hidden_layer_k'],
-                use_dropout=HYPERPARAMETERS['use_dropout']).to(gpu)
+                use_dropout=HYPERPARAMETERS['use_dropout'],
+                use_BN=HYPERPARAMETERS['use_bn']).to(gpu)
 
         if HYPERPARAMETERS['optimizer'] == 'adam':
             optimizer = Adam(params=nn.parameters(), lr=HYPERPARAMETERS['lr'])
