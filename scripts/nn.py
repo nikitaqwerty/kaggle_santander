@@ -204,7 +204,7 @@ def main():
     batch_size = HYPERPARAMETERS['batch_size']
     N_IN = 2
 
-    gpu = torch.device(f'cuda:{gpu_num}')
+    gpu = torch.device(f'cuda:{gpu_num % 4}')
     cpu = torch.device('cpu')
 
     folds = StratifiedKFold(n_splits=HYPERPARAMETERS['n_splits'], shuffle=True, random_state=42)
