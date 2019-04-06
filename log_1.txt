@@ -66,3 +66,9 @@ early_stop_wait 20
 upsampling_times 15
 upsampling_class_balancer 2
 0 0.92141
+1 0.92046
+2 0.92023
+3 0.92166
+4 0.92954
+5 0.92604
+6 0.92918

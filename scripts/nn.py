@@ -144,7 +144,7 @@ def main():
     torch.cuda.manual_seed(random_seed)
 
     HYPERPARAMETERS = {
-        'batch_size': 8192,  # [8192//2, 8192*2]
+        'batch_size': choice([4096, 8192, 16384]),  # [8192//2, 8192*2]
         'nn_encoder_out': choice(list(range(10, 100))),  # [20,40]
         'enc_hidden_layer_k': choice(np.linspace(0.5, 4.0, 8)),
     # [0.5,4] denominator of nn 'nn_encoder_out' E.G. if 'nn_encoder_out' = 30 so every feature encoder hidden layer size will be 15
