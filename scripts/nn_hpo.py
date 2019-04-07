@@ -324,9 +324,9 @@ def main():
               'upsampling_times': (3, 20),
               'upsampling_class_balancer': (2, 10)}
 
-    bo = BayesianOptimization(evaluate_nn, pbounds=bounds, random_state=42)
+    bo = BayesianOptimization(evaluate_nn, pbounds=bounds, random_state=gpu_num)
 
-    log_file = output_path + "logs.json"
+    log_file = output_path + f"hpo_logs_{gpu_num}.json"
     if isfile(log_file):
         load_logs(bo, logs=[log_file])
 
@@ -347,7 +347,7 @@ def main():
         lazy=True,
     )
 
-    bo.maximize(init_points=10, n_iter=100)
+    bo.maximize(init_points=30, n_iter=1000)
     result = bo.res
 
 if __name__ == "__main__":
