@@ -139,3 +139,4 @@ upsampling_class_balancer 2
 4 0.92884
 5 0.9238
 6 0.92788
+7 0.91572

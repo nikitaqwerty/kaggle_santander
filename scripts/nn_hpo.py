@@ -17,6 +17,7 @@ from torch.optim import Adam, RMSprop
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn.modules.loss import BCEWithLogitsLoss
 
+from bayes_opt import BayesianOptimization
 from bayes_opt.observer import JSONLogger
 from bayes_opt.event import Events
 from bayes_opt.util import load_logs
@@ -149,7 +150,7 @@ def main():
         new_params['use_dropout'] = new_params['use_dropout'] > 0.5
 
         params.update(new_params)
-        print('Training with params: {}'.format(params))
+        print('Training with params: {}'.format(new_params))
 
         ups = UpsamplingPreprocessor(params['upsampling_times'], params['upsampling_class_balancer'])
 
@@ -163,9 +164,9 @@ def main():
 
         folds = StratifiedKFold(n_splits=params['n_splits'], shuffle=True, random_state=42)
         oof = np.zeros(len(train))
-        predictions = np.zeros(len(test))
+
         for fold_, (trn_idx, val_idx) in enumerate(folds.split(train.values, label)):
-            print("Fold {}".format(fold_))
+            # print("Fold {}".format(fold_))
 
             X_train, Train_label = ups.fit_transform(train.loc[trn_idx], label.loc[trn_idx])
             X_val, Val_label = train.loc[val_idx], label.loc[val_idx]
@@ -187,8 +188,6 @@ def main():
             val_t = X_val.loc[:, cols_to_use].values
             train_tensors.append(torch.tensor(train_t, requires_grad=False, device=cpu, dtype=torch.float32))
             val_tensors.append(torch.tensor(val_t, requires_grad=False, device=cpu, dtype=torch.float32))
-
-            test_tensors.append(torch.tensor(test_t, requires_grad=False, device=gpu, dtype=torch.float32))
 
         train_tensors = torch.cat(train_tensors, 1).view((-1, 200, N_IN))
         val_tensors = torch.cat(val_tensors, 1).view((-1, 200, N_IN))
@@ -238,9 +237,9 @@ def main():
                     blobs.append(blob)
                 val_pred = np.concatenate(blobs)
                 AUC = roc_auc_score(label[val_idx], val_pred)
-                print('EPOCH {}'.format(epoch))
-                print('LOSS: ', loss_f(torch.tensor(val_pred), y_val_t))
-                print('AUC: ', AUC)
+                # print('EPOCH {}'.format(epoch))
+                # print('LOSS: ', loss_f(torch.tensor(val_pred), y_val_t))
+                # print('AUC: ', AUC)
                 scheduler.step(AUC)
 
                 if AUC > best_AUC:
@@ -249,12 +248,12 @@ def main():
                     torch.save(nn, output_path + f'best_auc_nn_{gpu_num}.pkl')
                 else:
                     early_stop += 1
-                    print('SCORE IS NOT THE BEST. Early stop counter: {}'.format(early_stop))
+                    # print('SCORE IS NOT THE BEST. Early stop counter: {}'.format(early_stop))
 
                 if early_stop == params['early_stop_wait']:
-                    print(f'EARLY_STOPPING NOW, BEST AUC = {best_AUC}')
+                    # print(f'EARLY_STOPPING NOW, BEST AUC = {best_AUC}')
                     break
-                print('=' * 50)
+                # print('=' * 50)
 
             best_model = torch.load(output_path + f'best_auc_nn_{gpu_num}.pkl')
 
@@ -280,8 +279,8 @@ def main():
 
     params = {'optimizer': 'adam',
               'n_splits': 10,
-              'lr_sheduler_min_lr': 0.0001
-              'max_epoch': 9999
+              'lr_sheduler_min_lr': 0.0001,
+              'max_epoch': 9999,
               'early_stop_wait': 20}
 
     print("\nSEED:", random_seed)
@@ -325,7 +324,7 @@ def main():
               'upsampling_times': (3, 20),
               'upsampling_class_balancer': (2, 10)}
 
-    bo = BayesianOptimization(evaluate_cb, pbounds=bounds, random_state=42)
+    bo = BayesianOptimization(evaluate_nn, pbounds=bounds, random_state=42)
 
     log_file = output_path + "logs.json"
     if isfile(log_file):
