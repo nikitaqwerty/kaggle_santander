@@ -333,20 +333,6 @@ def main():
     logger = JSONLogger(path=log_file)
     bo.subscribe(Events.OPTMIZATION_STEP, logger)
 
-    bo.probe(
-        params={'batch_size': 8192,
-                'nn_encoder_out': 50,
-                'enc_hidden_layer_k': 2,
-                'lr': 0.005,
-                'use_dropout': 1,
-                'use_bn': 1,
-                'lr_sheduler_factor': 0.5,
-                'lr_sheduler_patience': 10,
-                'upsampling_times': 10,
-                'upsampling_class_balancer': 5},
-        lazy=True,
-    )
-
     bo.maximize(init_points=30, n_iter=1000)
     result = bo.res
 
