@@ -45,6 +45,7 @@ class UpsamplingPreprocessor:
 
         t_pos = self.times
         t_neg = self.times // self.neg_class_balancer
+        t_neg = max(1, t_neg)
 
         X_pos_orig = X[y == 1]
         X_neg_orig = X[y == 0]
@@ -146,6 +147,8 @@ def main():
         new_params['lr_sheduler_patience'] = int(new_params['lr_sheduler_patience'])
         new_params['upsampling_times'] = int(new_params['upsampling_times'])
         new_params['upsampling_class_balancer'] = int(new_params['upsampling_class_balancer'])
+        new_params['upsampling_class_balancer'] = min(new_params['upsampling_class_balancer'],
+                                                      new_params['upsampling_times'])
         new_params['use_bn'] = new_params['use_bn'] > 0.5
         new_params['use_dropout'] = new_params['use_dropout'] > 0.5
 
@@ -215,7 +218,7 @@ def main():
 
         scheduler = ReduceLROnPlateau(optimizer, 'max', factor=params['lr_sheduler_factor'],
                                       patience=params['lr_sheduler_patience'],
-                                      min_lr=params['lr_sheduler_min_lr'], verbose=True)
+                                      min_lr=params['lr_sheduler_min_lr'], verbose=False)
 
         best_AUC = 0
         early_stop = 0
