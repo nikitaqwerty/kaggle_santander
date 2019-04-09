@@ -161,12 +161,36 @@ def main():
         'upsampling_times': choice(list(range(3, 20))),  # [3,20] more = slower
         'upsampling_class_balancer': choice(list(range(2, 10)))  # [0.1,7]
     }
-    
+
+    ans = {}
+    for i in range(6):
+        with open(f"../output/hpo_logs_{i}.json" ,"r") as f:
+            for item in f.readlines():
+                d = eval(item)
+                ans[d["target"]] = d["params"]
+
+    score = sorted(ans)[-gpu_num - 1]
+    params = ans[score]
+
+    params['batch_size'] = int(params['batch_size'])
+    params['nn_encoder_out'] = int(params['nn_encoder_out'])
+    params['lr_sheduler_patience'] = int(params['lr_sheduler_patience'])
+    params['upsampling_times'] = int(params['upsampling_times'])
+    params['upsampling_class_balancer'] = int(params['upsampling_class_balancer'])
+    params['upsampling_class_balancer'] = min(params['upsampling_class_balancer'],
+                                              params['upsampling_times'])
+    params['use_bn'] = params['use_bn'] > 0.5
+    params['use_dropout'] = params['use_dropout'] > 0.5
+
+    for key in params:
+        HYPERPARAMETERS[key] = params[key]
+
     with open(f"log_{gpu_num}.txt", "a") as f:
         for key in HYPERPARAMETERS:
             f.write(key + " " + str(HYPERPARAMETERS[key]) + "\n")
             print(key, HYPERPARAMETERS[key])
 
+    print(score)
     print("\nSEED:", random_seed)
     print("GPU:", gpu_num, "\n")
 
