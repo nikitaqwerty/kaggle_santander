@@ -155,3 +155,14 @@ max_epoch 9999
 early_stop_wait 20
 upsampling_times 19
 upsampling_class_balancer 2
+0 0.92177
+1 0.92124
+2 0.92067
+3 0.92209
+4 0.92919
+5 0.92594
+6 0.92957
+7 0.91988
+8 0.92093
+9 0.92045
+OOF 0.92316
